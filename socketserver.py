@@ -7,41 +7,37 @@ def train_test_model(msg = ''):
     msg = msg.replace('true','True')
     msg = msg.replace('false', 'False')
     msg = ast.literal_eval(msg)
-    
+
     if(type(msg) == dict):
         input_data = msg
     else:
         return "BAD JSON!!"
-    
+
     file_name = input_data['FileName']
-    if(input_data['Train'] == False):
+    if (input_data['Train'] == False):
         pred = build.predict(file_name, input_data['Bars'])
         print(pred)
-        responseJSON = {}
-        responseJSON['Pred'] = pred
+        responseJSON = {'Pred': pred}
         return json.dumps(responseJSON)+"\r\n"
-    
+
     data = input_data['Data']
     date = input_data['Time']    
-    
+
     testSize = int(input_data['TestingPart'] / 100 * len(data))
     trainSize = len(data) - testSize
-    
+
     train = build.train(training_set=data[:trainSize], date=date[:trainSize], lr=input_data['LearningRate'], scale=input_data['Scale'], epochs=input_data['Epochs'], momentum=input_data['Momentum'], optimizer=input_data['Optimizer'], loss = input_data['Loss'], file_name=file_name, architecture=input_data['Architecture'], cuda=input_data['GPU'])
     test = build.test(testing_set=data[trainSize:], date=date[trainSize:], file_name=input_data['FileName'])
     print(train)
     print(test)
-    
+
     evaluate = build.evaluate(file_name=file_name, testing_weight=input_data['TestingWeight'])
     print(evaluate)
 
     pred = build.predict(file_name, input_data['Bars'])
     print(pred)
 
-    responseJSON = {}
-    responseJSON['Eval'] = evaluate
-    responseJSON['Pred'] = pred
-
+    responseJSON = {'Eval': evaluate, 'Pred': pred}
     return json.dumps(responseJSON) + "\r\n"
 
 class socketserver:
