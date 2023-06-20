@@ -91,9 +91,6 @@ def getModel(X_train, architecture, isCuda):
             # Fourth LSTM layer 
             regressor.add(CuDNNLSTM(units=50))
             regressor.add(Dropout(0.2))
-            # The output layer
-            regressor.add(Dense(units=1))
-            return regressor
         else:
             # The LSTM architecture
             regressor = Sequential()
@@ -109,10 +106,9 @@ def getModel(X_train, architecture, isCuda):
             # Fourth LSTM layer 
             regressor.add(LSTM(units=50))
             regressor.add(Dropout(0.2))
-            # The output layer
-            regressor.add(Dense(units=1))
-            return regressor
-    
+        # The output layer
+        regressor.add(Dense(units=1))
+        return regressor
     elif architecture == Architecture.GRU.value:
         if isCuda:
             # The GRU architecture
@@ -129,9 +125,6 @@ def getModel(X_train, architecture, isCuda):
             # Fourth GRU layer
             regressorGRU.add(CuDNNGRU(units=50))
             regressorGRU.add(Dropout(0.2))
-            # The output layer
-            regressorGRU.add(Dense(units=1))
-            return regressorGRU
         else:
             # The GRU architecture
             regressorGRU = Sequential()
@@ -147,10 +140,9 @@ def getModel(X_train, architecture, isCuda):
             # Fourth GRU layer
             regressorGRU.add(GRU(units=50))
             regressorGRU.add(Dropout(0.2))
-            # The output layer
-            regressorGRU.add(Dense(units=1))
-            return regressorGRU
-
+        # The output layer
+        regressorGRU.add(Dense(units=1))
+        return regressorGRU
     elif architecture == Architecture.BidirectionalLSTM.value:
         if isCuda:
             # Bidirectional Model
@@ -167,9 +159,6 @@ def getModel(X_train, architecture, isCuda):
             # Fourth Bidirectional LSTM layer
             regressorBidirection.add(Bidirectional(CuDNNLSTM(units=50)))
             regressorBidirection.add(Dropout(0.2))
-            # The output layer
-            regressorBidirection.add(Dense(units=1))
-            return regressorBidirection
         else:
             # Bidirectional Model
             regressorBidirection = Sequential()
@@ -185,10 +174,9 @@ def getModel(X_train, architecture, isCuda):
             # Fourth Bidirectional LSTM layer
             regressorBidirection.add(Bidirectional(LSTM(units=50)))
             regressorBidirection.add(Dropout(0.2))
-            # The output layer
-            regressorBidirection.add(Dense(units=1))
-            return regressorBidirection
-
+        # The output layer
+        regressorBidirection.add(Dense(units=1))
+        return regressorBidirection
     elif architecture == Architecture.BidirectionalGRU.value:
         if isCuda:
             # Bidirectional Model
@@ -205,9 +193,6 @@ def getModel(X_train, architecture, isCuda):
             # Fourth Bidirectional LSTM layer
             regressorBidirection.add(Bidirectional(CuDNNGRU(units=50)))
             regressorBidirection.add(Dropout(0.2))
-            # The output layer
-            regressorBidirection.add(Dense(units=1))
-            return regressorBidirection
         else:
             # Bidirectional Model
             regressorBidirection = Sequential()
@@ -223,20 +208,19 @@ def getModel(X_train, architecture, isCuda):
             # Fourth Bidirectional LSTM layer
             regressorBidirection.add(Bidirectional(GRU(units=50)))
             regressorBidirection.add(Dropout(0.2))
-            # The output layer
-            regressorBidirection.add(Dense(units=1))
-            return regressorBidirection
+
+        # The output layer
+        regressorBidirection.add(Dense(units=1))
+        return regressorBidirection
 
         
 def getScaledData(training_set, scale, file_name):
 
     sc = MinMaxScaler(feature_range=(0,1))
     training_set_scaled = sc.fit_transform(training_set)
-    
-    pickle_out = open(file_name + '_scaler.pickle', 'wb')
-    pickle.dump(sc, pickle_out)
-    pickle_out.close()
 
+    with open(file_name + '_scaler.pickle', 'wb') as pickle_out:
+        pickle.dump(sc, pickle_out)
     # creating a data structure with window_size timesteps and 1 output
     # for each element of training set, we have window_size previous training set elements 
     X_train = []
@@ -261,7 +245,7 @@ def save_plot(test,predicted, file_name):
     plt.savefig(file_name + '.jpg')
     
 def train(training_set, date, lr, scale, epochs, momentum, optimizer, loss, file_name, architecture, cuda):
-    if(type(training_set) == list and type(date) == list):
+    if (type(training_set) == list and type(date) == list):
 
         # Constructing a pandas dataframe for reusability and reference
         df = pd.DataFrame(data = training_set, columns = ['Feature'], index = pd.to_datetime(date))
@@ -273,120 +257,115 @@ def train(training_set, date, lr, scale, epochs, momentum, optimizer, loss, file
 
         # Scaling and preprocessing the training set
         X_train, Y_train = getScaledData(training_set, scale, file_name)
-        
+
         # Constructing a stacked LSTM Sequential Model
         regressor = getModel(X_train, architecture, tf.test.is_gpu_available() if cuda else False)
 
         # Compiling the RNN
         regressor.compile(optimizer=getOptimizer(optimizer, lr, momentum), loss=getLoss(loss), metrics=['mse',r2_score])
-           
+
         # Fitting to the training set
         hist = regressor.fit(X_train, Y_train,epochs = epochs, batch_size=32)
 
         #Saving trained model
         regressor.save(file_name + '.h5')
-        
-        pickle_out = open(file_name + '_trainhist.pickle', 'wb')
-        pickle.dump(hist.history, pickle_out)
-        pickle_out.close()
-        
+
+        with open(file_name + '_trainhist.pickle', 'wb') as pickle_out:
+            pickle.dump(hist.history, pickle_out)
         #Deleting model instance
         del regressor
 
-        return 100    
-    else:
-        return 110
-
-def test(testing_set, date, file_name):
-    if(type(testing_set) == list and type(date) == list):
-
-        # Constructing a pandas dataframe for reusability and reference
-        df = pd.DataFrame(data = testing_set, columns = ['Feature'], index = date)
-        df.index.names = ['Date']
-        df.index = pd.to_datetime(df.index)
-        test_set = df['Feature'].values
-        
-        prev_dataset = pd.read_csv(file_name + '.csv', index_col = 'Date', parse_dates=['Date'])
-        
-        regressor = load_model(file_name + '.h5', custom_objects={'r2_score':r2_score})
-
-        file = open(file_name + '_scaler.pickle', 'rb')
-        scaler = pickle.load(file)
-        file.close()
-
-        # Now to get the test set ready in a similar way as the training set.
-        dataset_total = pd.concat((prev_dataset, df),axis=0, sort=False)
-        dataset_total.to_csv(file_name + '.csv')
-
-        inputs = dataset_total[len(dataset_total)-len(testing_set) - window_size:]['Feature'].values
-        inputs = inputs.reshape(-1,1)
-        inputs  = scaler.transform(inputs)
-
-        # Preparing X_test and predicting the prices
-        X_test = []
-        for i in range(window_size, inputs.shape[0]):
-            X_test.append(inputs[i - window_size:i,0])
-        X_test = np.array(X_test)
-        X_test = np.reshape(X_test, (X_test.shape[0],X_test.shape[1],1))
-        
-        predicted_stock_price = regressor.predict(X_test)
-        predicted_stock_price = scaler.inverse_transform(predicted_stock_price)
-
-        #save_plot(test_set, predicted_stock_price, file_name)
-
-        eval = regressor.evaluate(X_test, scaler.transform(test_set.reshape(-1,1)))
-
-        pickle_out = open(file_name + '_testhist.pickle', 'wb')
-        pickle.dump(eval, pickle_out)
-        pickle_out.close()
-
-        # Deleting model instance
-        del regressor
-        
         return 100
     else:
         return 110
 
+def test(testing_set, date, file_name):
+    if type(testing_set) != list or type(date) != list:
+
+        return 110
+    # Constructing a pandas dataframe for reusability and reference
+    df = pd.DataFrame(data = testing_set, columns = ['Feature'], index = date)
+    df.index.names = ['Date']
+    df.index = pd.to_datetime(df.index)
+    test_set = df['Feature'].values
+
+    prev_dataset = pd.read_csv(file_name + '.csv', index_col = 'Date', parse_dates=['Date'])
+
+    regressor = load_model(file_name + '.h5', custom_objects={'r2_score':r2_score})
+
+    with open(file_name + '_scaler.pickle', 'rb') as file:
+        scaler = pickle.load(file)
+    # Now to get the test set ready in a similar way as the training set.
+    dataset_total = pd.concat((prev_dataset, df),axis=0, sort=False)
+    dataset_total.to_csv(file_name + '.csv')
+
+    inputs = dataset_total[len(dataset_total)-len(testing_set) - window_size:]['Feature'].values
+    inputs = inputs.reshape(-1,1)
+    inputs  = scaler.transform(inputs)
+
+        # Preparing X_test and predicting the prices
+    X_test = [
+        inputs[i - window_size : i, 0]
+        for i in range(window_size, inputs.shape[0])
+    ]
+
+    X_test = np.array(X_test)
+    X_test = np.reshape(X_test, (X_test.shape[0],X_test.shape[1],1))
+
+    predicted_stock_price = regressor.predict(X_test)
+    predicted_stock_price = scaler.inverse_transform(predicted_stock_price)
+
+    #save_plot(test_set, predicted_stock_price, file_name)
+
+    eval = regressor.evaluate(X_test, scaler.transform(test_set.reshape(-1,1)))
+
+    with open(file_name + '_testhist.pickle', 'wb') as pickle_out:
+        pickle.dump(eval, pickle_out)
+    # Deleting model instance
+    del regressor
+
+    return 100
+
 def evaluate(file_name, testing_weight):
 
-    file = open(file_name + '_trainhist.pickle', 'rb')
-    trainHistory = pickle.load(file)
-    file.close()
-
-    file = open(file_name + '_testhist.pickle', 'rb')
-    testScores = pickle.load(file)
-    file.close()
-
+    with open(file_name + '_trainhist.pickle', 'rb') as file:
+        trainHistory = pickle.load(file)
+    with open(file_name + '_testhist.pickle', 'rb') as file:
+        testScores = pickle.load(file)
     trainScores = [trainHistory[key][-1] for key in trainHistory.keys()]
-    scoreList = [(trainScores[i] * (1 - testing_weight/100) + testScores[i] * (testing_weight/100))/2 for i in range(len(trainScores))]
-    
-    return scoreList
+    return [
+        (
+            trainScores[i] * (1 - testing_weight / 100)
+            + testScores[i] * (testing_weight / 100)
+        )
+        / 2
+        for i in range(len(trainScores))
+    ]
 
 def predict(file_name, bars):
-    if(bars < window_size):
+    if bars >= window_size:
         
-        prev_dataset = pd.read_csv(file_name + '.csv', index_col = 'Date', parse_dates=['Date'])
-        
-        regressor = load_model(file_name + '.h5', custom_objects={'r2_score':r2_score})
-
-        file = open(file_name + '_scaler.pickle', 'rb')
-        scaler = pickle.load(file)
-        file.close()
-
-        inputs = prev_dataset[len(prev_dataset) - bars - window_size:]['Feature'].values
-        inputs = inputs.reshape(-1,1)
-        inputs  = scaler.transform(inputs)
-        
-        # Preparing X_pred and predicting the prices
-        X_pred = []
-        for i in range(window_size, inputs.shape[0]):
-            X_pred.append(inputs[i - window_size:i,0])
-        X_pred = np.array(X_pred)
-        X_pred = np.reshape(X_pred, (X_pred.shape[0],X_pred.shape[1],1))
-        
-        predicted_stock_price = regressor.predict(X_pred)
-        predicted_stock_price = scaler.inverse_transform(predicted_stock_price)
-        
-        return predicted_stock_price.reshape(predicted_stock_price.shape[0]).tolist()
-    else:
         return -1
+    prev_dataset = pd.read_csv(file_name + '.csv', index_col = 'Date', parse_dates=['Date'])
+
+    regressor = load_model(file_name + '.h5', custom_objects={'r2_score':r2_score})
+
+    with open(file_name + '_scaler.pickle', 'rb') as file:
+        scaler = pickle.load(file)
+    inputs = prev_dataset[len(prev_dataset) - bars - window_size:]['Feature'].values
+    inputs = inputs.reshape(-1,1)
+    inputs  = scaler.transform(inputs)
+
+        # Preparing X_pred and predicting the prices
+    X_pred = [
+        inputs[i - window_size : i, 0]
+        for i in range(window_size, inputs.shape[0])
+    ]
+
+    X_pred = np.array(X_pred)
+    X_pred = np.reshape(X_pred, (X_pred.shape[0],X_pred.shape[1],1))
+
+    predicted_stock_price = regressor.predict(X_pred)
+    predicted_stock_price = scaler.inverse_transform(predicted_stock_price)
+
+    return predicted_stock_price.reshape(predicted_stock_price.shape[0]).tolist()
